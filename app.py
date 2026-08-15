@@ -3,9 +3,9 @@ import pandas as pd
 import joblib
 
 
-# =========================================================
+# ============================================================
 # PAGE CONFIGURATION
-# =========================================================
+# ============================================================
 
 st.set_page_config(
     page_title="Customer Churn Prediction",
@@ -14,17 +14,17 @@ st.set_page_config(
 )
 
 
-# =========================================================
+# ============================================================
 # FILE PATHS
-# =========================================================
+# ============================================================
 
 PREPROCESSOR_FILE = "preprocessing.pkl"
 MODEL_FILE = "customer_churn_model.pkl"
 
 
-# =========================================================
+# ============================================================
 # LOAD MODEL ARTIFACTS
-# =========================================================
+# ============================================================
 
 @st.cache_resource
 def load_artifacts():
@@ -40,12 +40,22 @@ def load_artifacts():
     return preprocessing, model
 
 
-preprocessing, model = load_artifacts()
+try:
+
+    preprocessing, model = load_artifacts()
+
+except Exception as e:
+
+    st.error(
+        "Unable to load the model files."
+    )
+
+    st.stop()
 
 
-# =========================================================
+# ============================================================
 # EXPECTED FEATURES
-# =========================================================
+# ============================================================
 
 FEATURE_ORDER = [
     "latitude",
@@ -103,47 +113,53 @@ CATEGORICAL_COLUMNS = [
 ]
 
 
-# =========================================================
+# ============================================================
 # PREDICTION FUNCTION
-# =========================================================
+# ============================================================
 
 def predict_customer(input_data):
 
+    # --------------------------------------------------------
     # Create DataFrame
-    input_df = pd.DataFrame(
+    # --------------------------------------------------------
+
+    test_customer = pd.DataFrame(
         [input_data],
         columns=FEATURE_ORDER
     )
 
-    # -----------------------------------------------------
+    # --------------------------------------------------------
     # Convert numerical columns
-    # -----------------------------------------------------
+    # --------------------------------------------------------
 
     for column in NUMERIC_COLUMNS:
 
-        input_df[column] = pd.to_numeric(
-            input_df[column],
+        test_customer[column] = pd.to_numeric(
+            test_customer[column],
             errors="coerce"
         )
 
-    # -----------------------------------------------------
-    # Convert categorical columns to string
-    # -----------------------------------------------------
+    # --------------------------------------------------------
+    # Convert categorical columns
+    # --------------------------------------------------------
 
     for column in CATEGORICAL_COLUMNS:
 
-        input_df[column] = input_df[column].astype(str)
+        test_customer[column] = (
+            test_customer[column]
+            .astype(str)
+        )
 
-    # -----------------------------------------------------
-    # Validate numerical values
-    # -----------------------------------------------------
+    # --------------------------------------------------------
+    # Check for invalid numerical values
+    # --------------------------------------------------------
 
-    if input_df[NUMERIC_COLUMNS].isna().any().any():
+    if test_customer[NUMERIC_COLUMNS].isna().any().any():
 
         invalid_columns = (
-            input_df[NUMERIC_COLUMNS]
+            test_customer[NUMERIC_COLUMNS]
             .columns[
-                input_df[NUMERIC_COLUMNS]
+                test_customer[NUMERIC_COLUMNS]
                 .isna()
                 .any()
             ]
@@ -151,20 +167,21 @@ def predict_customer(input_data):
         )
 
         raise ValueError(
-            f"Invalid numerical value in: {invalid_columns}"
+            f"Invalid numerical values in: {invalid_columns}"
         )
 
-    # -----------------------------------------------------
-    # Apply fitted preprocessing
-    # -----------------------------------------------------
+    # --------------------------------------------------------
+    # IMPORTANT
+    # Apply the SAME preprocessing used during training
+    # --------------------------------------------------------
 
     X_processed = preprocessing.transform(
-        input_df
+        test_customer
     )
 
-    # -----------------------------------------------------
-    # Model prediction
-    # -----------------------------------------------------
+    # --------------------------------------------------------
+    # Prediction
+    # --------------------------------------------------------
 
     prediction = model.predict(
         X_processed
@@ -177,9 +194,9 @@ def predict_customer(input_data):
     return int(prediction), float(probability)
 
 
-# =========================================================
+# ============================================================
 # APPLICATION HEADER
-# =========================================================
+# ============================================================
 
 st.title(
     "📊 Customer Churn Prediction"
@@ -188,29 +205,27 @@ st.title(
 st.markdown(
     """
     Predict whether a telecom customer is likely to churn
-    based on demographic, service, tenure, and billing
-    information.
+    based on demographic, service, tenure and billing information.
     """
 )
 
 st.info(
-    "Model: Gradient Boosting Classifier  |  "
-    "Preprocessing: StandardScaler + OneHotEncoder"
+    "Machine Learning Model: Gradient Boosting Classifier"
 )
 
 
-# =========================================================
+# ============================================================
 # SIDEBAR
-# =========================================================
+# ============================================================
 
 st.sidebar.header(
     "Customer Information"
 )
 
 
-# =========================================================
+# ============================================================
 # DEMOGRAPHICS
-# =========================================================
+# ============================================================
 
 st.sidebar.subheader(
     "Demographics"
@@ -267,9 +282,9 @@ dependents = st.sidebar.selectbox(
 )
 
 
-# =========================================================
+# ============================================================
 # ACCOUNT
-# =========================================================
+# ============================================================
 
 st.sidebar.subheader(
     "Account"
@@ -285,9 +300,9 @@ tenure_months = st.sidebar.number_input(
 )
 
 
-# =========================================================
+# ============================================================
 # SERVICES
-# =========================================================
+# ============================================================
 
 st.sidebar.subheader(
     "Services"
@@ -376,9 +391,9 @@ streaming_movies = st.sidebar.selectbox(
 )
 
 
-# =========================================================
+# ============================================================
 # BILLING
-# =========================================================
+# ============================================================
 
 st.sidebar.subheader(
     "Billing"
@@ -421,9 +436,9 @@ total_charges = st.sidebar.number_input(
 )
 
 
-# =========================================================
+# ============================================================
 # CUSTOMER VALUE
-# =========================================================
+# ============================================================
 
 st.sidebar.subheader(
     "Customer Value"
@@ -446,9 +461,9 @@ cltv = st.sidebar.number_input(
 )
 
 
-# =========================================================
-# BUILD INPUT DATA
-# =========================================================
+# ============================================================
+# CREATE INPUT DATA
+# ============================================================
 
 input_data = {
 
@@ -498,9 +513,9 @@ input_data = {
 }
 
 
-# =========================================================
-# PREDICTION SECTION
-# =========================================================
+# ============================================================
+# PREDICTION
+# ============================================================
 
 st.subheader(
     "Prediction"
@@ -519,12 +534,16 @@ if st.button(
             input_data
         )
 
-        # -------------------------------------------------
-        # Results
-        # -------------------------------------------------
+        # ----------------------------------------------------
+        # Result columns
+        # ----------------------------------------------------
 
         col1, col2 = st.columns(2)
 
+
+        # ----------------------------------------------------
+        # Probability
+        # ----------------------------------------------------
 
         with col1:
 
@@ -533,6 +552,10 @@ if st.button(
                 f"{probability:.2%}"
             )
 
+
+        # ----------------------------------------------------
+        # Prediction
+        # ----------------------------------------------------
 
         with col2:
 
@@ -549,53 +572,59 @@ if st.button(
                 )
 
 
-        # -------------------------------------------------
+        # ----------------------------------------------------
         # Probability bar
-        # -------------------------------------------------
+        # ----------------------------------------------------
 
         st.progress(
             probability
         )
 
 
-        # -------------------------------------------------
-        # Customer input summary
-        # -------------------------------------------------
+        # ----------------------------------------------------
+        # Customer information
+        # ----------------------------------------------------
 
         with st.expander(
             "View Customer Information"
         ):
 
-            input_display = pd.DataFrame(
+            display_df = pd.DataFrame(
                 [input_data]
             ).T
 
-            input_display.columns = [
+            display_df.columns = [
                 "Value"
             ]
 
             st.dataframe(
-                input_display,
+                display_df,
                 use_container_width=True
             )
 
 
-    except Exception:
+    except Exception as e:
 
         st.error(
-            "Prediction failed. "
-            "Please verify the input values."
+            "Prediction failed. Please verify the input values."
+        )
+
+        # Show error while debugging/developing.
+        # Remove this line before final public deployment
+        # if you don't want technical details exposed.
+        st.error(
+            str(e)
         )
 
 
-# =========================================================
+# ============================================================
 # FOOTER
-# =========================================================
+# ============================================================
 
 st.divider()
 
 st.caption(
     "Customer Churn Prediction | "
-    "Machine Learning Project | "
-    "Gradient Boosting Classifier"
+    "Gradient Boosting Classifier | "
+    "Machine Learning Project"
 )
